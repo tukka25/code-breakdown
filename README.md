@@ -1,5 +1,7 @@
 # code-breakdown
 
+[![tests](https://github.com/tukka25/code-breakdown/actions/workflows/tests.yml/badge.svg)](https://github.com/tukka25/code-breakdown/actions/workflows/tests.yml)
+
 Ask your coding agent to break down a file, an HTTP endpoint or a pull request, and get a canvas of the **real code**. The code is cut at declaration boundaries and laid out in the order it runs: the entry point, then what it calls, then the types it uses. You get the code itself, not an essay about it.
 
 ![POST /orders broken down: the route handler on the left, the service and repository functions it calls in the middle, the request, response and table models in a Data column on the right](docs/images/endpoint-post-orders.png)
