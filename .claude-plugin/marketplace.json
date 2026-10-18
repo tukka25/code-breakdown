@@ -1,0 +1,12 @@
+{
+  "name": "code-breakdown",
+  "description": "The breakdown skill: real code from a file, endpoint or pull request, laid out in call order on a hand-drawn canvas.",
+  "owner": { "name": "ATukka", "url": "https://github.com/tukka25" },
+  "plugins": [
+    {
+      "name": "code-breakdown",
+      "source": ".",
+      "description": "Break a file, an HTTP endpoint or a pull request into a hand-drawn canvas of the real code, laid out in call order."
+    }
+  ]
+}

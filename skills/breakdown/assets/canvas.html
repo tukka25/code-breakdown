@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="generator" content="code-breakdown">
+<title>__BD_TITLE__</title>
+<style>
+/*__BD_FONTS__*/
+/* Layout: one full-window canvas; title, controls, stepper and legend float over its corners. Dark first. */
+:root {
+  color-scheme: dark;
+  --bg: #0d1014;
+  --canvas: #11151a;
+  --dot: rgba(150, 168, 190, 0.09);
+  --panel: #161b21;
+  --box: #151a20;
+  --fg: #e3e7ed;
+  --muted: #8b95a3;
+  --line: #262e38;
+  --ink-code: #5ec4ec;
+  --ink-type: #b79bf4;
+  --ink-box: #8f7ab8;
+  --ink-label: #eef1f5;
+  --hit: rgba(94, 196, 236, 0.17);
+  --add: #7fd99a;
+  --add-bg: rgba(127, 217, 154, 0.13);
+  --del: #ff9b9b;
+  --del-bg: rgba(255, 155, 155, 0.12);
+  --syn-plain: #d3d9e1;
+  --syn-kw: #ff7f97;
+  --syn-def: #ffd37d;
+  --syn-type: #70d6c1;
+  --syn-str: #b6df8e;
+  --syn-num: #f4a56c;
+  --syn-dec: #b79bf4;
+  --syn-com: #6f7987;
+  --font-code: "BD Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-label: "BD Condensed", "Avenir Next Condensed", "Arial Narrow", sans-serif;
+  --font-body: "BD Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --code-size: 11px;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #edeff3; --canvas: #f8f9fb; --dot: rgba(40, 56, 78, 0.11); --panel: #ffffff; --box: #ffffff;
+    --fg: #18202b; --muted: #596473; --line: #d5dae2;
+    --ink-code: #0a76aa; --ink-type: #6b44c2; --ink-box: #7b62a8; --ink-label: #1a2330; --hit: rgba(10, 118, 170, 0.12);
+    --add: #1d7f41; --add-bg: rgba(29, 127, 65, 0.10); --del: #b93232; --del-bg: rgba(185, 50, 50, 0.09);
+    --syn-plain: #1f2834; --syn-kw: #be1858; --syn-def: #875200; --syn-type: #007567; --syn-str: #2d7628; --syn-num: #ad4a0a; --syn-dec: #6b44c2; --syn-com: #7d8796;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #edeff3; --canvas: #f8f9fb; --dot: rgba(40, 56, 78, 0.11); --panel: #ffffff; --box: #ffffff;
+  --fg: #18202b; --muted: #596473; --line: #d5dae2;
+  --ink-code: #0a76aa; --ink-type: #6b44c2; --ink-box: #7b62a8; --ink-label: #1a2330; --hit: rgba(10, 118, 170, 0.12);
+  --add: #1d7f41; --add-bg: rgba(29, 127, 65, 0.10); --del: #b93232; --del-bg: rgba(185, 50, 50, 0.09);
+  --syn-plain: #1f2834; --syn-kw: #be1858; --syn-def: #875200; --syn-type: #007567; --syn-str: #2d7628; --syn-num: #ad4a0a; --syn-dec: #6b44c2; --syn-com: #7d8796;
+}
+
+html, body { height: 100%; margin: 0; background: var(--bg); }
+body { color: var(--fg); font: 400 14px/1.45 var(--font-body); overflow: hidden; }
+button { font: inherit; color: inherit; }
+button:focus-visible, a:focus-visible, .box:focus-visible, #viewport:focus-visible, summary:focus-visible { outline: 2px solid var(--ink-code); outline-offset: 2px; }
+
+#viewport {
+  position: fixed; inset: 0; overflow: hidden; touch-action: none; cursor: grab; background-color: var(--canvas);
+  background-image: radial-gradient(circle, var(--dot) 1.1px, transparent 1.5px); background-size: 24px 24px;
+}
+#viewport.dragging { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; user-select: none; -webkit-user-select: none; }
+svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+/* A faint copy of every arrow above the boxes, so an arrow passing behind a box reads as passing through it. */
+#edges-over .edge { opacity: 0.2; }
+#edges-over .edge .head, #edges-over .edge path.head { display: none; }
+.frame path { fill: none; stroke: var(--ink-code); stroke-width: 1.6; }
+.frame.type path { stroke: var(--ink-type); }
+.frame.container path { stroke: var(--ink-box); stroke-width: 1.5; }
+.edge path { fill: none; stroke: var(--ink-code); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.edge.uses path { stroke: var(--ink-type); stroke-dasharray: 6 5; }
+.edge.uses .head path, .edge.uses path.head { stroke-dasharray: none; }
+.edge.sec { display: none; }
+.edge.sec.on { display: inline; }
+.edge.on path { stroke-width: 2.3; }
+.frame, .edge, .box, .head-label { transition: opacity 0.18s ease; }
+#world.has-sel .box:not(.sel):not(.rel):not(.container),
+#world.has-sel .frame:not(.sel):not(.rel):not(.container) { opacity: 0.22; }
+#world.has-sel .edge:not(.on) { opacity: 0.08; }
+#world.has-sel #edges-over .edge:not(.on) { opacity: 0.03; }
+#edges-over .edge.on { opacity: 0.5; }
+
+.box {
+  position: absolute; left: 0; top: 0; box-sizing: border-box; padding: 0 12px 10px; border-radius: 3px;
+  background: var(--box); color: var(--syn-plain); cursor: pointer;
+  font-family: var(--font-code); font-size: var(--code-size); line-height: 16px; font-variant-ligatures: none; tab-size: 4;
+}
+.box.container { background: transparent; cursor: default; }
+.box.same { opacity: 0.62; }
+.cap { display: flex; align-items: center; gap: 10px; height: 22px; font-size: 10px; color: var(--muted); white-space: nowrap; }
+.cap a { color: inherit; text-decoration: none; overflow: hidden; text-overflow: ellipsis; }
+.cap a:hover { color: var(--fg); text-decoration: underline; }
+.cap .n { margin-left: auto; font-family: var(--font-label); font-size: 15px; font-weight: 600; color: var(--ink-code); font-variant-numeric: tabular-nums; }
+.box.type .cap .n { color: var(--ink-type); }
+.badge { padding: 0 5px; border-radius: 3px; font-family: var(--font-body); font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; line-height: 15px; }
+.badge.new, .badge.changed { color: var(--add); background: var(--add-bg); }
+.badge.deleted { color: var(--del); background: var(--del-bg); }
+.l { position: relative; height: 16px; margin: 0 -12px; padding: 0 12px; white-space: pre; }
+.l.hit { background: var(--hit); }
+.l.add { background: var(--add-bg); }
+.l.del { background: var(--del-bg); }
+.l.add::before, .l.del::before { position: absolute; left: 3px; font-weight: 600; }
+.l.add::before { content: "+"; color: var(--add); }
+.l.del::before { content: "\2212"; color: var(--del); }
+.tail { position: absolute; left: 12px; bottom: 6px; color: var(--syn-plain); white-space: pre; }
+.tag {
+  position: absolute; left: 1px; bottom: calc(100% + 9px); white-space: nowrap;
+  font-family: var(--font-label); font-weight: 600; font-size: 17px; line-height: 1; letter-spacing: 0.01em; color: var(--ink-label);
+}
+.head-label { position: absolute; left: 0; top: 0; font-family: var(--font-label); font-weight: 600; font-size: 30px; line-height: 1; color: var(--ink-label); }
+.k { color: var(--syn-kw); }
+.f { color: var(--syn-def); }
+.t { color: var(--syn-type); }
+.s { color: var(--syn-str); }
+.nu { color: var(--syn-num); }
+.d { color: var(--syn-dec); }
+.c { color: var(--syn-com); font-style: italic; }
+
+/* Floating panels */
+.hud {
+  position: fixed; z-index: 2; display: flex; align-items: center; gap: 4px; padding: 5px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--muted); font-size: 12.5px; line-height: 1.25;
+}
+.hud button {
+  min-width: 32px; height: 30px; padding: 0 10px; border: 1px solid transparent; border-radius: 7px;
+  background: transparent; color: var(--fg); font-weight: 500; font-size: 13px; cursor: pointer;
+}
+.hud button:hover { border-color: var(--line); }
+.hud button[aria-pressed="true"] { background: var(--canvas); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-code); }
+.title {
+  top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px));
+  display: block; padding: 10px 14px 11px; max-width: min(560px, calc(100vw - 360px)); min-width: 220px;
+}
+.title .kind { font-family: var(--font-code); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.title h1 { margin: 2px 0 4px; font-family: var(--font-label); font-weight: 600; font-size: 26px; line-height: 1.05; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title p { margin: 0; }
+.title .stats { margin-top: 4px; font-family: var(--font-code); font-size: 11px; font-variant-numeric: tabular-nums; }
+.title .claim-btn { margin: 8px 0 0 -10px; color: var(--ink-code); }
+.controls { top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); flex-wrap: wrap; justify-content: flex-end; max-width: min(440px, calc(100vw - 24px)); }
+.controls .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+.controls .lbl { padding: 0 2px 0 6px; }
+.stepper { left: calc(12px + env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); max-width: calc(100vw - 24px); }
+.step-label { min-width: 0; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-family: var(--font-code); font-size: 12px; font-variant-numeric: tabular-nums; }
+.legend { right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); flex-direction: column; align-items: flex-end; gap: 6px; padding: 8px 12px; max-width: min(460px, calc(100vw - 24px)); }
+.legend .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 14px; }
+.key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.key svg { width: 28px; height: 8px; overflow: visible; }
+.key .call { stroke: var(--ink-code); stroke-width: 1.6; }
+.key .use { stroke: var(--ink-type); stroke-width: 1.6; stroke-dasharray: 5 4; }
+.legend details { align-self: stretch; text-align: right; }
+.legend summary { cursor: pointer; color: var(--fg); list-style-position: inside; }
+.legend ul { margin: 6px 0 0; padding: 0; list-style: none; text-align: left; display: grid; gap: 3px; }
+.claim {
+  position: fixed; z-index: 3; top: 150px; left: calc(12px + env(safe-area-inset-left, 0px));
+  width: min(520px, calc(100vw - 24px)); max-height: min(60vh, calc(100vh - 230px)); overflow: auto;
+  padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+}
+.claim h2 { margin: 0 0 2px; font-family: var(--font-label); font-weight: 600; font-size: 20px; }
+.claim .src { font-family: var(--font-code); font-size: 11px; color: var(--muted); }
+.claim .src a { color: var(--ink-code); }
+.claim pre { margin: 10px 0 0; white-space: pre-wrap; word-break: break-word; font-family: var(--font-body); font-size: 13.5px; color: var(--fg); }
+.claim .close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--fg); cursor: pointer; }
+.fail { position: fixed; inset: 20% 10% auto; z-index: 9; padding: 16px; border: 1px solid var(--del); border-radius: 10px; background: var(--panel); color: var(--fg); font-family: var(--font-code); white-space: pre-wrap; }
+
+@media (max-width: 760px) {
+  .title { max-width: calc(100vw - 24px); top: calc(60px + env(safe-area-inset-top, 0px)); }
+  .title .rule { display: none; }
+  .legend .hint, .legend .order-key { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .frame, .edge, .box, .head-label { transition: none; }
+}
+</style>
+</head>
+<body>
+<div id="viewport" tabindex="0" aria-label="Code canvas. Drag to pan. Hold Ctrl or Command and scroll to zoom. Left and right arrow keys step through the reading order.">
+  <div id="world">
+    <svg id="ink" aria-hidden="true"><g id="frames"></g><g id="edges"></g></svg>
+    <div id="heads"></div>
+    <div id="boxes"></div>
+    <svg id="ink-over" aria-hidden="true"><g id="edges-over"></g></svg>
+  </div>
+</div>
+
+<header class="hud title">
+  <div class="kind" id="kind"></div>
+  <h1 id="title"></h1>
+  <p class="rule" id="rule"></p>
+  <p class="stats" id="stats"></p>
+  <button type="button" class="claim-btn" id="claim-btn" hidden>Author's claim</button>
+</header>
+
+<div class="hud controls">
+  <span class="lbl">Types</span>
+  <button type="button" id="mode-column" aria-pressed="true" title="Every type in a final column">Column</button>
+  <button type="button" id="mode-beside" aria-pressed="false" title="Each type under the first code that uses it">Beside</button>
+  <span class="sep"></span>
+  <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+  <button type="button" id="zoom-fit">Fit</button>
+  <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+  <button type="button" id="theme" aria-label="Switch light or dark">◐</button>
+</div>
+
+<div class="hud stepper">
+  <button type="button" id="step-prev" aria-label="Previous block in reading order">◀</button>
+  <span class="step-label" id="step-label" aria-live="polite">Step through the reading order</span>
+  <button type="button" id="step-next" aria-label="Next block in reading order">▶</button>
+</div>
+
+<div class="hud legend">
+  <div class="keys">
+    <span class="key"><svg viewBox="0 0 28 8" aria-hidden="true"><line class="call" x1="1" y1="4" x2="27" y2="4"/></svg>calls</span>
+    <span class="key"><svg viewBox="0 0 28 8" aria-hidden="true"><line class="use" x1="1" y1="4" x2="27" y2="4"/></svg>uses a type</span>
+    <span class="key order-key" id="order-key"></span>
+    <span class="key hint">click a box to see all its arrows</span>
+  </div>
+  <details>
+    <summary>Not shown</summary>
+    <ul id="not-shown"></ul>
+  </details>
+</div>
+
+<section class="claim" id="claim" hidden aria-labelledby="claim-title">
+  <button type="button" class="close hud-close" id="claim-close" aria-label="Close">✕</button>
+  <h2 id="claim-title">Author's claim</h2>
+  <div class="src" id="claim-src"></div>
+  <pre id="claim-body"></pre>
+</section>
+
+<script type="application/json" id="bd-data">__BD_DATA__</script>
+<script>/*__BD_ROUGH__*/</script>
+<script>
+(() => {
+  "use strict";
+  const doc = document.documentElement;
+  try {
+    main(JSON.parse(document.getElementById("bd-data").textContent));
+    doc.dataset.rendered = "ok";
+  } catch (error) {
+    doc.dataset.rendered = "error";
+    const box = document.createElement("div");
+    box.className = "fail";
+    box.textContent = "This canvas could not be drawn: " + (error && error.message ? error.message : error) +
+      "\nThe checked blocks and arrows are in tree.json next to this file.";
+    document.body.appendChild(box);
+    throw error;
+  }
+
+  function main(DATA) {
+    const NS = "http://www.w3.org/2000/svg";
+    const C = DATA.consts;
+    const LH = C.LH, CAP = C.CAP;
+    const META = DATA.meta;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const hash = (s) => { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 99991) + 1; };
+    const $ = (id) => document.getElementById(id);
+
+    const BLOCKS = DATA.blocks;
+    const BY = Object.fromEntries(BLOCKS.map((b) => [b.id, b]));
+    const EDGES = DATA.edges.map((e) => ({ ...e, seed: hash(e.from + ">" + e.to) }));
+
+    // ---- Syntax colours: a small tokenizer per language family ----
+    const LANGS = {
+      python: { kw: "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case", types: "int str bool list dict float bytes tuple set object", line: ["#"], quotes: ['"""', "'''", '"', "'"], multi: ['"""', "'''"], deco: true },
+      js: { kw: "abstract as async await break case catch class const constructor continue debugger declare default delete do else enum export extends false finally for from function get if implements import in instanceof interface is keyof let new null of private protected public readonly return satisfies set static super switch this throw true try type typeof undefined var void while with yield", types: "string number boolean any unknown never object bigint symbol Promise Array Map Set Record Partial", line: ["//"], block: ["/*", "*/"], quotes: ['"', "'", "`"], multi: ["`"], deco: true },
+      go: { kw: "break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var nil true false iota", types: "int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 float32 float64 string bool byte rune error any", line: ["//"], block: ["/*", "*/"], quotes: ['"', "`", "'"], multi: ["`"] },
+      java: { kw: "abstract assert break case catch class const continue default do else enum extends final finally for goto if implements import instanceof interface native new null package private protected public return static strictfp super switch synchronized this throw throws transient try volatile while true false var record sealed permits yield fun val override open data object companion when is in internal suspend", types: "int long short byte char boolean double float void String Integer Long Boolean List Map Set Optional", line: ["//"], block: ["/*", "*/"], quotes: ['"""', '"', "'"], multi: ['"""'], deco: true },
+      csharp: { kw: "abstract as async await base break case catch class const continue default delegate do else enum event explicit extern false finally fixed for foreach get if implicit in interface internal is lock namespace new null operator out override params private protected public readonly record ref return sealed set static struct switch this throw true try typeof using var virtual void volatile while yield", types: "int long short byte char bool double float decimal string object Task List Dictionary", line: ["//"], block: ["/*", "*/"], quotes: ['"', "'"], multi: [] },
+      rust: { kw: "as async await break const continue crate dyn else enum extern false fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use where while", types: "i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64 bool char str String Vec Option Result Box", line: ["//"], block: ["/*", "*/"], quotes: ['"'], multi: ['"'] },
+      ruby: { kw: "alias and begin break case class def defined do else elsif end ensure false for if in module next nil not or redo rescue retry return self super then true undef unless until when while yield attr_reader attr_writer attr_accessor private protected public require", types: "", line: ["#"], quotes: ['"', "'"], multi: [] },
+      php: { kw: "abstract and array as break callable case catch class clone const continue declare default do echo else elseif empty extends final finally fn for foreach function global if implements include instanceof interface isset list match namespace new null or print private protected public readonly require return static switch throw trait try unset use var while yield true false", types: "int string bool float array mixed void", line: ["//", "#"], block: ["/*", "*/"], quotes: ['"', "'"], multi: [] },
+      c: { kw: "auto break case const continue default do else enum extern for goto if inline register restrict return sizeof static struct switch typedef union volatile while true false nullptr class namespace template typename public private protected virtual override new delete this using operator friend", types: "int long short char float double void bool unsigned signed size_t", line: ["//"], block: ["/*", "*/"], quotes: ['"', "'"], multi: [] },
+      swift: { kw: "actor as associatedtype async await break case catch class continue default defer deinit do else enum extension fallthrough false fileprivate for func guard if import in init inout internal is let nil open operator private protocol public repeat rethrows return self Self static struct subscript super switch throw throws true try typealias var where while", types: "Int Double Float Bool String Character Array Dictionary Set Optional", line: ["//"], block: ["/*", "*/"], quotes: ['"""', '"'], multi: ['"""'], deco: true },
+      sql: { kw: "select from where join left right inner outer full cross on group by order having insert into values update set delete create table alter drop index and or not null is in as distinct limit offset returning with case when then else end union all exists primary key foreign references default", types: "", line: ["--"], block: ["/*", "*/"], quotes: ["'", '"'], multi: [], ci: true },
+      plain: { kw: "", types: "", line: [], quotes: ['"', "'"], multi: [] },
+    };
+    const DEF_WORDS = new Set("def class function func fn interface struct type enum trait impl module record object".split(" "));
+    function tokenizer(lang) {
+      const s = LANGS[lang] || LANGS.plain;
+      const kw = new Set(s.kw ? s.kw.split(" ") : []);
+      const types = new Set(s.types ? s.types.split(" ") : []);
+      return (lines) => {
+        let state = null;
+        return lines.map((line) => {
+          let out = "", i = 0, prev = "";
+          const push = (cls, text) => { out += cls ? `<span class="${cls}">${esc(text)}</span>` : esc(text); };
+          while (i < line.length) {
+            if (state && state.type === "block") {
+              const j = line.indexOf(s.block[1], i);
+              const end = j < 0 ? line.length : j + s.block[1].length;
+              push("c", line.slice(i, end)); i = end;
+              if (j >= 0) state = null;
+              continue;
+            }
+            if (state && state.type === "str") {
+              let j = i, closed = false;
+              while (j < line.length) {
+                if (line[j] === "\\") { j += 2; continue; }
+                if (line.startsWith(state.delim, j)) { j += state.delim.length; closed = true; break; }
+                j++;
+              }
+              j = Math.min(j, line.length);
+              push("s", line.slice(i, j)); i = j;
+              if (closed) state = null;
+              continue;
+            }
+            const rest = line.slice(i);
+            if (s.line.some((p) => rest.startsWith(p))) { push("c", rest); break; }
+            if (s.block && rest.startsWith(s.block[0])) { state = { type: "block" }; push("c", s.block[0]); i += s.block[0].length; continue; }
+            const q = s.quotes.find((d) => rest.startsWith(d));
+            if (q) { state = { type: "str", delim: q, multi: s.multi.includes(q) }; push("s", q); i += q.length; continue; }
+            let m;
+            if (s.deco && (m = /^@[A-Za-z_][\w.]*/.exec(rest))) { push("d", m[0]); i += m[0].length; prev = ""; continue; }
+            if ((m = /^\d[\d_]*(\.\d+)?([eE][+-]?\d+)?[a-zA-Z]*/.exec(rest)) && !/[\w$]/.test(line[i - 1] || "")) { push("nu", m[0]); i += m[0].length; prev = ""; continue; }
+            if ((m = /^[A-Za-z_$][\w$]*/.exec(rest))) {
+              const w = m[0];
+              if (kw.has(s.ci ? w.toLowerCase() : w)) { push("k", w); prev = w; }
+              else if (DEF_WORDS.has(prev)) { push("f", w); prev = ""; }
+              else if (/^[A-Z]/.test(w) || types.has(w)) { push("t", w); prev = ""; }
+              else { push("", w); prev = ""; }
+              i += w.length;
+              continue;
+            }
+            if (!/\s/.test(line[i])) prev = "";
+            push("", line[i]);
+            i++;
+          }
+          if (state && state.type === "str" && !state.multi) state = null;
+          return out || " ";
+        });
+      };
+    }
+
+    // ---- Build the boxes once; layouts only move them ----
+    const viewport = $("viewport"), world = $("world"), ink = $("ink");
+    const framesLayer = $("frames"), edgesLayer = $("edges"), overLayer = $("edges-over"), boxesLayer = $("boxes"), headsLayer = $("heads");
+    const rc = window.rough && typeof window.rough.svg === "function" ? window.rough.svg(ink) : null;
+    const root = (META.root || "").replace(/\\/g, "/");
+    const fileUrl = (file, line) => {
+      const abs = (root.startsWith("/") ? root : "/" + root) + "/" + file;
+      return "vscode://file" + encodeURI(abs) + ":" + line;
+    };
+    const els = {}, frames = {};
+    const ordered = BLOCKS.filter((b) => b.role === "container").concat(BLOCKS.filter((b) => b.role !== "container"));
+    for (const b of ordered) {
+      const el = document.createElement("div");
+      el.className = `box ${b.role}${b.status ? " " + b.status : ""}`;
+      el.dataset.id = b.id;
+      if (b.role !== "container") { el.tabIndex = 0; el.setAttribute("role", "button"); }
+      el.setAttribute("aria-label", `${b.id}, ${b.file} lines ${b.start} to ${b.end}`);
+      const marks = b.marks || {};
+      const add = new Set(marks["+"] || []), del = new Set(marks["-"] || []);
+      const html = tokenizer(b.lang)(b.lines);
+      const badge = b.status && b.status !== "same" ? `<span class="badge ${b.status}">${b.status}</span>` : "";
+      el.innerHTML =
+        (b.label ? `<div class="tag">${esc(b.label)}</div>` : "") +
+        `<div class="cap"><a href="${esc(fileUrl(b.file, b.start))}" title="Open in VS Code">${esc(b.file)}:${b.start}–${b.end}</a>${badge}<span class="n"></span></div>` +
+        html.map((h, i) => `<div class="l${add.has(i) ? " add" : ""}${del.has(i) ? " del" : ""}" data-i="${i}">${h}</div>`).join("") +
+        (b.tail ? `<div class="tail">${tokenizer(b.lang)([b.tail])[0]}</div>` : "");
+      boxesLayer.appendChild(el);
+      els[b.id] = el;
+    }
+
+    function sizeBoxes(P) {
+      for (const b of BLOCKS) {
+        const r = P[b.id];
+        els[b.id].style.width = r[2] + "px";
+        els[b.id].style.height = r[3] + "px";
+      }
+    }
+    function buildFrames(P) {
+      framesLayer.replaceChildren();
+      for (const b of ordered) {
+        const [, , w, h] = P[b.id];
+        const g = document.createElementNS(NS, "g");
+        g.setAttribute("class", `frame ${b.role}`);
+        if (rc) {
+          const rough = b.role === "container" ? { roughness: 1.2, bowing: 1.2 } : { roughness: 1.5, bowing: 2 };
+          g.appendChild(rc.rectangle(-5, -5, w + 10, h + 10, { ...rough, strokeWidth: 1.6, seed: hash(b.id) }));
+        } else {
+          const p = document.createElementNS(NS, "path");
+          p.setAttribute("d", `M-4,-5 L${w + 5},-4 L${w + 4},${h + 5} L-5,${h + 4} Z`);
+          g.appendChild(p);
+        }
+        framesLayer.appendChild(g);
+        frames[b.id] = g;
+      }
+    }
+
+    // ---- Arrows: leave from the line that mentions the target, enter at its declaration ----
+    function anchors(e, P) {
+      const s = P[e.from], t = P[e.to];
+      const sy = s[1] + CAP + (e.line + 0.5) * LH;
+      const ty = t[1] + CAP + (BY[e.to].def + 0.5) * LH;
+      const sL = s[0], sR = s[0] + s[2], tL = t[0], tR = t[0] + t[2];
+      if (tL >= sR + 12) return { mode: "rl", sx: sR + 6, sy, tx: tL - 7, ty };
+      if (tR <= sL - 12) return { mode: "lr", sx: sL - 6, sy, tx: tR + 7, ty };
+      return { mode: "ll", sx: sL - 6, sy, tx: tL - 7, ty };
+    }
+    function geometry(a) {
+      if (a.mode === "rl") {
+        const dx = Math.max(44, (a.tx - a.sx) * 0.5);
+        return { d: `M${a.sx},${a.sy} C${a.sx + dx},${a.sy} ${a.tx - dx},${a.ty} ${a.tx},${a.ty}`, cx: a.tx - dx, cy: a.ty };
+      }
+      if (a.mode === "lr") {
+        const dx = Math.max(44, (a.sx - a.tx) * 0.5);
+        return { d: `M${a.sx},${a.sy} C${a.sx - dx},${a.sy} ${a.tx + dx},${a.ty} ${a.tx},${a.ty}`, cx: a.tx + dx, cy: a.ty };
+      }
+      const lx = Math.min(a.sx, a.tx) - (26 + Math.min(64, Math.abs(a.ty - a.sy) * 0.12));
+      return { d: `M${a.sx},${a.sy} C${lx},${a.sy} ${lx},${a.ty} ${a.tx},${a.ty}`, cx: lx, cy: a.ty };
+    }
+    function headPath(a, g) {
+      const ang = Math.atan2(a.ty - g.cy, a.tx - g.cx), L = 9, w = 0.42;
+      return `M${a.tx - L * Math.cos(ang - w)},${a.ty - L * Math.sin(ang - w)} L${a.tx},${a.ty} L${a.tx - L * Math.cos(ang + w)},${a.ty - L * Math.sin(ang + w)}`;
+    }
+
+    let mode = META.default === "beside" ? "beside" : "column";
+    if (location.hash === "#beside" || location.hash === "#column") mode = location.hash.slice(1);
+    let P = null, cur = null, sel = null, touched = false;
+    let cam = { x: 0, y: 0, s: 1 };
+
+    function renderEdges(Pos, sketchy) {
+      edgesLayer.replaceChildren();
+      overLayer.replaceChildren();
+      for (const e of EDGES) {
+        const a = anchors(e, Pos), g = geometry(a), h = headPath(a, g);
+        const on = !!sel && (e.from === sel || e.to === sel);
+        const eg = document.createElementNS(NS, "g");
+        eg.setAttribute("class", `edge ${e.kind}${e.primary ? "" : " sec"}${on ? " on" : ""}`);
+        if (sketchy && rc) {
+          eg.appendChild(rc.path(g.d, { roughness: 0.85, bowing: 0.8, strokeWidth: 1.5, seed: e.seed }));
+          const hg = rc.path(h, { roughness: 0.3, bowing: 0, strokeWidth: 1.5, seed: e.seed + 7 });
+          hg.setAttribute("class", "head");
+          eg.appendChild(hg);
+        } else {
+          const p1 = document.createElementNS(NS, "path"); p1.setAttribute("d", g.d);
+          const p2 = document.createElementNS(NS, "path"); p2.setAttribute("d", h); p2.setAttribute("class", "head");
+          eg.append(p1, p2);
+        }
+        e.el = eg;
+        e.over = eg.cloneNode(true);
+        edgesLayer.appendChild(eg);
+        overLayer.appendChild(e.over);
+      }
+    }
+    function place(Pos) {
+      for (const b of BLOCKS) {
+        const r = Pos[b.id];
+        els[b.id].style.transform = `translate(${r[0]}px, ${r[1]}px)`;
+        frames[b.id].setAttribute("transform", `translate(${r[0]} ${r[1]})`);
+      }
+    }
+    function renderHeads(L) {
+      headsLayer.replaceChildren();
+      for (const [text, x, y] of DATA.layouts[L].heads) {
+        const d = document.createElement("div");
+        d.className = "head-label";
+        d.textContent = text;
+        d.style.transform = `translate(${x}px, ${y}px)`;
+        headsLayer.appendChild(d);
+      }
+    }
+    function applyCam() {
+      world.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.s})`;
+      const g = 24 * cam.s;
+      viewport.style.backgroundSize = `${g}px ${g}px`;
+      viewport.style.backgroundPosition = `${cam.x}px ${cam.y}px`;
+    }
+    function fitCam(L) {
+      const [x0, y0, x1, y1] = DATA.layouts[L].bounds;
+      const vw = viewport.clientWidth, vh = viewport.clientHeight;
+      const top = vw < 760 ? 230 : 150, bottom = 70, side = 24;
+      const w = x1 - x0, h = y1 - y0;
+      const s = clamp(Math.min((vw - side * 2) / w, (vh - top - bottom) / h), 0.08, 1.15);
+      return { s, x: (vw - w * s) / 2 - x0 * s, y: top + (vh - top - bottom - h * s) / 2 - y0 * s };
+    }
+
+    let raf = 0;
+    const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+    function tween(ms, step, done) {
+      cancelAnimationFrame(raf);
+      if (reduce || ms <= 0) { step(1); if (done) done(); return; }
+      const t0 = performance.now();
+      const tick = (now) => {
+        const k = Math.min(1, (now - t0) / ms);
+        step(ease(k));
+        if (k < 1) raf = requestAnimationFrame(tick);
+        else if (done) done();
+      };
+      raf = requestAnimationFrame(tick);
+    }
+    const lerp = (a, b, k) => a + (b - a) * k;
+    function lerpPos(A, B, k) {
+      const out = {};
+      for (const id of Object.keys(B)) { const a = A[id], b = B[id]; out[id] = [lerp(a[0], b[0], k), lerp(a[1], b[1], k), b[2], b[3]]; }
+      return out;
+    }
+    const lerpCam = (A, B, k) => ({ x: lerp(A.x, B.x, k), y: lerp(A.y, B.y, k), s: lerp(A.s, B.s, k) });
+
+    function applySel() {
+      world.classList.toggle("has-sel", !!sel);
+      boxesLayer.querySelectorAll(".l.hit").forEach((n) => n.classList.remove("hit"));
+      const rel = new Set();
+      for (const e of EDGES) {
+        const on = !!sel && (e.from === sel || e.to === sel);
+        if (e.el) e.el.classList.toggle("on", on);
+        if (e.over) e.over.classList.toggle("on", on);
+        if (on) {
+          rel.add(e.from); rel.add(e.to);
+          const ln = els[e.from].querySelector(`.l[data-i="${e.line}"]`);
+          if (ln) ln.classList.add("hit");
+        }
+      }
+      for (const b of BLOCKS) {
+        const isSel = b.id === sel, isRel = rel.has(b.id) && !isSel;
+        els[b.id].classList.toggle("sel", isSel); els[b.id].classList.toggle("rel", isRel);
+        frames[b.id].classList.toggle("sel", isSel); frames[b.id].classList.toggle("rel", isRel);
+      }
+      const order = DATA.layouts[mode].order, i = sel ? order.indexOf(sel) : -1;
+      $("step-label").textContent = i >= 0 ? `${i + 1} / ${order.length} · ${sel}` : "Step through the reading order";
+    }
+    function numberBoxes() {
+      for (const b of BLOCKS) { const n = els[b.id].querySelector(".n"); if (n) n.textContent = ""; }
+      DATA.layouts[mode].order.forEach((id, i) => { const n = els[id].querySelector(".n"); if (n) n.textContent = String(i + 1); });
+      $("order-key").textContent = `1–${DATA.layouts[mode].order.length} reading order`;
+    }
+    const RULES = {
+      column: "Read left to right: the entry point, then what it calls, in call order. Types are in the last column.",
+      beside: "Read left to right: the entry point, then what it calls, in call order. Each type sits under the first code that uses it.",
+    };
+    function markMode() {
+      $("mode-column").setAttribute("aria-pressed", String(mode === "column"));
+      $("mode-beside").setAttribute("aria-pressed", String(mode === "beside"));
+      $("rule").textContent = RULES[mode];
+    }
+
+    function setMode(L, animate) {
+      mode = L;
+      markMode();
+      numberBoxes();
+      try { history.replaceState(null, "", "#" + L); } catch (err) { /* a file: URL may refuse; the switch still works */ }
+      const to = DATA.layouts[L].boxes, from = cur;
+      P = to;
+      const camFrom = { ...cam }, camTo = fitCam(L);
+      touched = false;
+      if (!from || !animate) {
+        cur = to; place(cur); cam = camTo; applyCam(); renderEdges(cur, true); renderHeads(L); applySel();
+        return;
+      }
+      headsLayer.replaceChildren();
+      tween(760, (k) => {
+        cur = lerpPos(from, to, k); place(cur);
+        cam = lerpCam(camFrom, camTo, k); applyCam();
+        renderEdges(cur, false); applySel();
+      }, () => { cur = to; renderEdges(to, true); renderHeads(L); applySel(); });
+    }
+    function moveCam(target, ms) {
+      const from = { ...cam };
+      tween(ms, (k) => { cam = lerpCam(from, target, k); applyCam(); });
+    }
+    function zoomAt(px, py, factor) {
+      const s = clamp(cam.s * factor, 0.08, 2.6);
+      cam = { s, x: px - (px - cam.x) * (s / cam.s), y: py - (py - cam.y) * (s / cam.s) };
+      touched = true;
+      applyCam();
+    }
+    function focusBox(id) {
+      const r = P[id], vw = viewport.clientWidth, vh = viewport.clientHeight;
+      const k = clamp(Math.min((vw - 60) / r[2], (vh - 220) / r[3], 1.15), 0.25, 1.15);
+      touched = true;
+      moveCam({ s: k, x: vw / 2 - (r[0] + r[2] / 2) * k, y: vh / 2 + 10 - (r[1] + r[3] / 2) * k }, 420);
+    }
+    function select(id) { sel = id; applySel(); }
+    function step(dir) {
+      const order = DATA.layouts[mode].order;
+      let i = sel ? order.indexOf(sel) : -1;
+      i = i < 0 ? (dir > 0 ? 0 : order.length - 1) : (i + dir + order.length) % order.length;
+      select(order[i]);
+      focusBox(order[i]);
+    }
+
+    // ---- Pointer and keys ----
+    const pts = new Map();
+    let drag = null, pinch = null;
+    viewport.addEventListener("pointerdown", (ev) => {
+      if (ev.button > 0 || (ev.target.closest && ev.target.closest("a"))) return;
+      viewport.setPointerCapture(ev.pointerId);
+      pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pts.size === 1) drag = { x: ev.clientX, y: ev.clientY, cx: cam.x, cy: cam.y, moved: false, target: ev.target };
+      if (pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), s: cam.s, cx: cam.x, cy: cam.y, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+        drag = null;
+      }
+    });
+    viewport.addEventListener("pointermove", (ev) => {
+      if (!pts.has(ev.pointerId)) return;
+      pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pinch && pts.size >= 2) {
+        const [a, b] = [...pts.values()];
+        const s = clamp(pinch.s * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, 0.08, 2.6);
+        cam = { s, x: pinch.mx - (pinch.mx - pinch.cx) * (s / pinch.s), y: pinch.my - (pinch.my - pinch.cy) * (s / pinch.s) };
+        touched = true; applyCam();
+        return;
+      }
+      if (!drag) return;
+      const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) > 4) { drag.moved = true; viewport.classList.add("dragging"); }
+      if (drag.moved) { cam = { ...cam, x: drag.cx + dx, y: drag.cy + dy }; touched = true; applyCam(); }
+    });
+    function endPointer(ev) {
+      if (!pts.has(ev.pointerId)) return;
+      pts.delete(ev.pointerId);
+      if (pts.size < 2) pinch = null;
+      if (drag && pts.size === 0) {
+        if (!drag.moved && ev.type === "pointerup") {
+          const box = drag.target && drag.target.closest ? drag.target.closest(".box:not(.container)") : null;
+          select(box ? (box.dataset.id === sel ? null : box.dataset.id) : null);
+        }
+        viewport.classList.remove("dragging");
+        drag = null;
+      }
+    }
+    viewport.addEventListener("pointerup", endPointer);
+    viewport.addEventListener("pointercancel", endPointer);
+    viewport.addEventListener("wheel", (ev) => {
+      ev.preventDefault();
+      if (ev.ctrlKey || ev.metaKey) zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.0022));
+      else { cam = { ...cam, x: cam.x - ev.deltaX, y: cam.y - ev.deltaY }; touched = true; applyCam(); }
+    }, { passive: false });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.target.closest && ev.target.closest("button, a, summary")) return;
+      if (ev.key === "ArrowRight") { ev.preventDefault(); step(1); }
+      else if (ev.key === "ArrowLeft") { ev.preventDefault(); step(-1); }
+      else if (ev.key === "Escape") { select(null); $("claim").hidden = true; }
+      else if ((ev.key === "Enter" || ev.key === " ") && ev.target.classList && ev.target.classList.contains("box")) { ev.preventDefault(); select(ev.target.dataset.id); }
+    });
+
+    $("mode-column").addEventListener("click", () => { if (mode !== "column") setMode("column", true); });
+    $("mode-beside").addEventListener("click", () => { if (mode !== "beside") setMode("beside", true); });
+    $("zoom-in").addEventListener("click", () => zoomAt(viewport.clientWidth / 2, viewport.clientHeight / 2, 1.25));
+    $("zoom-out").addEventListener("click", () => zoomAt(viewport.clientWidth / 2, viewport.clientHeight / 2, 0.8));
+    $("zoom-fit").addEventListener("click", () => { touched = false; moveCam(fitCam(mode), 380); });
+    $("step-prev").addEventListener("click", () => step(-1));
+    $("step-next").addEventListener("click", () => step(1));
+    $("theme").addEventListener("click", () => {
+      const dark = doc.dataset.theme ? doc.dataset.theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      doc.dataset.theme = dark ? "light" : "dark";
+    });
+    window.addEventListener("resize", () => { if (!touched && P) { cam = fitCam(mode); applyCam(); } });
+
+    // ---- Header, the author's claim, and what the canvas does not show ----
+    const counts = META.counts;
+    const CLAIM = META.claim;
+    const kindName = { file: "File", endpoint: "Endpoint", pr: CLAIM && CLAIM.number ? `Pull request #${CLAIM.number}` : "Change" };
+    $("kind").textContent = kindName[META.kind] || META.kind;
+    $("title").textContent = META.title;
+    $("title").title = META.title;
+    document.title = META.title + " · breakdown";
+    const stats = [`${counts.blocks} blocks`, `${counts.arrows} arrows`, `${counts.files} ${counts.files === 1 ? "file" : "files"}`];
+    if (counts.changed !== undefined) stats.push(`${counts.changed} changed`, `${counts.added} new`, `${counts.deleted} deleted`);
+    if (META.base) stats.push(`${META.base.slice(0, 12)} → ${(META.head || "working tree").slice(0, 12)}`);
+    $("stats").textContent = stats.join(" · ");
+    if (CLAIM) {
+      const btn = $("claim-btn");
+      btn.hidden = false;
+      const from = CLAIM.source === "commits" ? "From the commit messages, oldest first" : "From the pull request";
+      $("claim-src").innerHTML = esc(from) + (CLAIM.url ? ` · <a href="${esc(CLAIM.url)}" target="_blank" rel="noopener">${esc(CLAIM.url)}</a>` : "");
+      $("claim-title").textContent = CLAIM.title || "Author's claim";
+      $("claim-body").textContent = CLAIM.body && CLAIM.body.trim() ? CLAIM.body : "This pull request has no description.";
+      btn.addEventListener("click", () => { $("claim").hidden = !$("claim").hidden; });
+      $("claim-close").addEventListener("click", () => { $("claim").hidden = true; });
+    }
+    const notShown = [
+      "Runtime order, and calls made through dynamic dispatch or reflection",
+      "What happens when a call fails at runtime",
+      "Tests, and code outside these blocks",
+      "Why the code exists; read the ticket or the PR description",
+    ];
+    if (META.unreached && META.unreached.length) notShown.unshift(`Not reached from the entry point: ${META.unreached.join(", ")}`);
+    $("not-shown").innerHTML = notShown.map((t) => `<li>${esc(t)}</li>`).join("");
+
+    // ---- First draw ----
+    function calibrate() {
+      const probe = document.createElement("span");
+      probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font-family:var(--font-code);font-size:11px;font-variant-ligatures:none";
+      probe.textContent = "M".repeat(200);
+      document.body.appendChild(probe);
+      const w = probe.getBoundingClientRect().width / 200;
+      probe.remove();
+      if (w > 3 && Math.abs(w - C.CHAR_W) > 0.04) doc.style.setProperty("--code-size", (11 * C.CHAR_W / w).toFixed(3) + "px");
+    }
+    calibrate();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(calibrate);
+    sizeBoxes(DATA.layouts[mode].boxes);
+    buildFrames(DATA.layouts[mode].boxes);
+    setMode(mode, false);
+  }
+})();
+</script>
+</body>
+</html>

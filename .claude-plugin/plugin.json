@@ -1,0 +1,10 @@
+{
+  "name": "code-breakdown",
+  "description": "Break a file, an HTTP endpoint or a pull request into a hand-drawn canvas of the real code, laid out in call order.",
+  "version": "1.0.0",
+  "author": { "name": "ATukka", "url": "https://github.com/tukka25" },
+  "homepage": "https://github.com/tukka25/code-breakdown",
+  "repository": "https://github.com/tukka25/code-breakdown",
+  "license": "MIT",
+  "keywords": ["code review", "code reading", "call flow", "canvas", "excalidraw"]
+}

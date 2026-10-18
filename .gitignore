@@ -1,0 +1,12 @@
+# Breakdown output and the draft spec live here in any repo the skill runs in.
+.breakdown/
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Third-party video frames and transcribed code used during research; not ours to publish.
+docs/research/reel/

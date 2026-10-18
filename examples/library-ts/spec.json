@@ -1,0 +1,33 @@
+{
+  "kind": "file",
+  "title": "src/loans.ts",
+  "entry": ["lendBook"],
+  "blocks": [
+    {"id": "lendBook", "file": "src/loans.ts", "start": 57, "end": 74, "label": "Entry point"},
+    {"id": "checkLimit", "file": "src/loans.ts", "start": 50, "end": 55},
+    {"id": "Catalog", "file": "src/loans.ts", "start": 23, "end": 42, "role": "container", "label": "Catalog class"},
+    {"id": "Catalog.constructor", "file": "src/loans.ts", "start": 24, "end": 24, "parent": "Catalog"},
+    {"id": "Catalog.find", "file": "src/loans.ts", "start": 26, "end": 32, "parent": "Catalog"},
+    {"id": "Catalog.takeCopy", "file": "src/loans.ts", "start": 34, "end": 41, "parent": "Catalog", "label": "Changes stock"},
+    {"id": "dueDate", "file": "src/loans.ts", "start": 44, "end": 48},
+    {"id": "Loan", "file": "src/loans.ts", "start": 15, "end": 21, "role": "type"},
+    {"id": "Member", "file": "src/loans.ts", "start": 9, "end": 13, "role": "type"},
+    {"id": "Book", "file": "src/loans.ts", "start": 3, "end": 7, "role": "type"},
+    {"id": "LoanStatus", "file": "src/loans.ts", "start": 1, "end": 1, "role": "type"}
+  ],
+  "edges": [
+    {"from": "lendBook", "to": "checkLimit"},
+    {"from": "lendBook", "to": "Catalog.takeCopy"},
+    {"from": "lendBook", "to": "dueDate"},
+    {"from": "lendBook", "to": "Member"},
+    {"from": "lendBook", "to": "Loan"},
+    {"from": "checkLimit", "to": "Member"},
+    {"from": "checkLimit", "to": "Loan"},
+    {"from": "Catalog.takeCopy", "to": "Catalog.find"},
+    {"from": "Catalog.takeCopy", "to": "Book"},
+    {"from": "Catalog.find", "to": "Catalog.constructor", "via": "this.books"},
+    {"from": "Catalog.find", "to": "Book"},
+    {"from": "Catalog.constructor", "to": "Book"},
+    {"from": "Loan", "to": "LoanStatus"}
+  ]
+}
