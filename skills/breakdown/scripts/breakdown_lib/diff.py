@@ -7,14 +7,16 @@ import re
 import subprocess
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from .model import Spec
+from .lang import DECLARATION, family, indent
+from .model import Block, Spec
 from .source import Source, SourceError
 
 HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 CLAIM_CHARS = 20000
+Hunk = Tuple[int, int, int, int]
 
 
-def parse_hunks(text: str) -> List[Tuple[int, int, int, int]]:
+def parse_hunks(text: str) -> List[Hunk]:
     """(old_start, old_count, new_start, new_count) for each hunk of a zero-context diff."""
     hunks = []
     for line in text.splitlines():
@@ -25,7 +27,7 @@ def parse_hunks(text: str) -> List[Tuple[int, int, int, int]]:
     return hunks
 
 
-def changed_lines(hunks: List[Tuple[int, int, int, int]]) -> Tuple[Set[int], Set[int], Set[int]]:
+def changed_lines(hunks: List[Hunk]) -> Tuple[Set[int], Set[int], Set[int]]:
     """Removed base lines, added head lines, and head lines right after which something was deleted."""
     removed: Set[int] = set()
     added: Set[int] = set()
@@ -38,25 +40,72 @@ def changed_lines(hunks: List[Tuple[int, int, int, int]]) -> Tuple[Set[int], Set
     return removed, added, cut
 
 
-def _insertions(hunks: List[Tuple[int, int, int, int]], start: int, end: int,
-                base_lines: List[str]) -> Dict[int, List[str]]:
+def _declares_other(line: str, token: str, fam: Optional[str]) -> bool:
+    pattern = DECLARATION.get(fam or "")
+    m = pattern.match(line) if pattern else None
+    return bool(m) and m.group(1) != token
+
+
+def _clip(old: List[str], def_indent: int, token: str, fam: Optional[str]) -> List[str]:
+    """The removed lines that belong to this block: stop where another declaration at its level begins."""
+    out: List[str] = []
+    for line in old:
+        if line.strip() and indent(line) <= def_indent and _declares_other(line, token, fam):
+            break
+        out.append(line)
+    while out and not out[-1].strip():
+        out.pop()
+    return out
+
+
+def _deeper(old: List[str], def_indent: int) -> List[str]:
+    """Leading removed lines indented deeper than the declaration: the end of a Python body."""
+    out: List[str] = []
+    for line in old:
+        if line.strip() and indent(line) <= def_indent:
+            break
+        out.append(line)
+    while out and not out[-1].strip():
+        out.pop()
+    return out
+
+
+def _insertions(hunks: List[Hunk], b: Block, base_lines: List[str]) -> Dict[int, List[str]]:
     """Removed base lines to show inside a head block, keyed by the head line index they come before."""
+    fam = family(b.file)
+    def_indent = indent(b.lines[b.def_line]) if b.lines else 0
     out: Dict[int, List[str]] = {}
-    for a, b, c, d in hunks:
-        if b == 0:
+    for a, count, c, d in hunks:
+        if count == 0:
             continue
+        old = base_lines[a - 1:a - 1 + count]
         if d > 0:
             # A replacement: the old lines go just before the new ones, which start at head line c.
-            if not start <= c <= end:
+            if not b.start <= c <= b.end:
                 continue
-            index = c - start
+            index, run = c - b.start, _clip(old, def_indent, b.token, fam)
+        elif b.start <= c < b.end:
+            # A pure deletion between head lines c and c + 1.
+            index, run = c + 1 - b.start, _clip(old, def_indent, b.token, fam)
+        elif c == b.end and fam == "python":
+            # Python bodies have no closing line, so a deletion right after the last line may end the body.
+            index, run = c + 1 - b.start, _deeper(old, def_indent)
         else:
-            # A pure deletion between head lines c and c + 1, counted only when it falls inside the block.
-            if not start <= c < end:
-                continue
-            index = c + 1 - start
-        out.setdefault(index, []).extend(base_lines[a - 1:a - 1 + b])
+            continue
+        if run:
+            out.setdefault(index, []).extend(run)
     return out
+
+
+def _renames(source: Source, base: str, head: Optional[str]) -> Dict[str, str]:
+    """New path -> old path for files the change renamed."""
+    args = ["diff", "--name-status", "-M", "--no-color", base] + ([head] if head else [])
+    renames: Dict[str, str] = {}
+    for line in source.git(*args).splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3 and parts[0].startswith("R"):
+            renames[parts[2]] = parts[1]
+    return renames
 
 
 def change_markers(spec: Spec, source: Source) -> Dict[str, Dict[str, Any]]:
@@ -64,30 +113,39 @@ def change_markers(spec: Spec, source: Source) -> Dict[str, Dict[str, Any]]:
     if not spec.base:
         return {}
     base = source.merge_base(spec.base, spec.head)
-    per_file: Dict[str, List[Tuple[int, int, int, int]]] = {}
-    for path in sorted({b.file for b in spec.blocks}):
-        args = ["diff", "-U0", "--no-color", "--no-ext-diff", base]
-        if spec.head:
-            args.append(spec.head)
-        per_file[path] = parse_hunks(source.git(*args, "--", path))
+    renames = _renames(source, base, spec.head)
+    per_file: Dict[str, Tuple[List[Hunk], bool, str]] = {}
+    for path in sorted({b.file for b in spec.blocks if b.side == "head"}):
+        old_path = renames.get(path, path)
+        if not source.exists(old_path, base):
+            per_file[path] = ([], False, old_path)  # new in this change, tracked or not
+            continue
+        args = ["diff", "-U0", "-M", "--no-color", "--no-ext-diff", base] + ([spec.head] if spec.head else [])
+        paths = [old_path, path] if old_path != path else [path]
+        per_file[path] = (parse_hunks(source.git(*args, "--", *paths)), True, old_path)
+    base_side: Dict[str, List[Hunk]] = {}
+    for path in sorted({b.file for b in spec.blocks if b.side == "base"}):
+        args = ["diff", "-U0", "--no-color", "--no-ext-diff", base] + ([spec.head] if spec.head else [])
+        base_side[path] = parse_hunks(source.git(*args, "--", path))
 
     markers: Dict[str, Dict[str, Any]] = {}
     for b in spec.blocks:
-        hunks = per_file[b.file]
-        removed, added, cut = changed_lines(hunks)
         numbers = range(b.start, b.end + 1)
         if b.side == "base":
+            removed, _, _ = changed_lines(base_side[b.file])
             gone = [i for i, n in enumerate(numbers) if n in removed]
             status = "deleted" if len(gone) == len(numbers) else "changed"
             markers[b.id] = {"status": status, "added": [], "removed": gone, "inserted": {}}
             continue
+        hunks, existed, old_path = per_file[b.file]
+        if not existed:
+            markers[b.id] = {"status": "new", "added": list(range(len(numbers))), "removed": [], "inserted": {}}
+            continue
+        _, added, cut = changed_lines(hunks)
         plus = [i for i, n in enumerate(numbers) if n in added]
         inserted: Dict[int, List[str]] = {}
-        if b.role != "container" and any(bb for _, bb, _, _ in hunks):
-            try:
-                inserted = _insertions(hunks, b.start, b.end, source.read(b.file, base))
-            except SourceError:
-                inserted = {}  # the file is new in head, so nothing was removed from it
+        if b.role != "container" and any(count for _, count, _, _ in hunks):
+            inserted = _insertions(hunks, b, source.read(old_path, base))
         trimmed = any(b.start <= n < b.end for n in cut)
         if plus and len(plus) == len(numbers):
             status = "new"
@@ -123,7 +181,8 @@ def pull_request(source: Source, number: int) -> Tuple[Optional[Dict[str, Any]],
     """Fetch the PR title and description verbatim with gh. Returns (claim, warning)."""
     try:
         out = subprocess.run(["gh", "pr", "view", str(number), "--json", "number,title,body,url"],
-                             cwd=str(source.root), capture_output=True, text=True, timeout=60)
+                             cwd=str(source.root), capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=60)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return None, f"could not run gh to read PR #{number}: {exc}"
     if out.returncode != 0:

@@ -14,11 +14,18 @@ class SourceError(Exception):
     pass
 
 
+def run_git(cwd: Path, *args: str) -> "subprocess.CompletedProcess[str]":
+    """Run git with UTF-8 output whatever the system code page, so code is never garbled."""
+    return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+
+
 def git_root(start: Path) -> Optional[Path]:
     try:
-        out = subprocess.run(["git", "-C", str(start), "rev-parse", "--show-toplevel"],
-                             capture_output=True, text=True, check=True)
-    except (OSError, subprocess.CalledProcessError):
+        out = run_git(start, "rev-parse", "--show-toplevel")
+    except OSError:
+        return None
+    if out.returncode != 0 or not out.stdout.strip():
         return None
     return Path(out.stdout.strip())
 
@@ -39,7 +46,7 @@ class Source:
 
     def git(self, *args: str) -> str:
         try:
-            out = subprocess.run(["git", "-C", str(self.root), *args], capture_output=True, text=True)
+            out = run_git(self.root, *args)
         except OSError as exc:
             raise SourceError(f"git is not available: {exc}") from exc
         if out.returncode != 0:
@@ -65,6 +72,13 @@ class Source:
         lines = split_lines(text)
         self._cache[key] = lines
         return lines
+
+    def exists(self, path: str, ref: str) -> bool:
+        try:
+            self.git("cat-file", "-e", f"{ref}:{path}")
+            return True
+        except SourceError:
+            return False
 
     def merge_base(self, base: str, head: Optional[str]) -> str:
         key = (base, head or "HEAD")

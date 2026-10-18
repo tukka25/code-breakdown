@@ -1,0 +1,4 @@
+# Keep line endings stable so line numbers in specs and tests mean the same thing everywhere.
+* text=auto eol=lf
+*.png binary
+*.woff2 binary

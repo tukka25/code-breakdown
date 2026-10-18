@@ -67,10 +67,13 @@ def build_payload(spec: Spec, order: Order, layouts: Dict[str, Layout], *, root:
             line = src.def_line
         dst_role = spec.block(e.dst).role
         primary = dst_role != "type" or order.owner.get(e.dst) in (spec.node_of(e.src), e.src)
-        if e.line in set(markers.get(e.src, {}).get("added", [])):
+        # e.line already counts the shown rows, removed lines included.
+        if src.rows is not None:
+            changed = {i for i, (_, mark) in enumerate(src.rows) if mark}
+        else:
+            changed = set(markers.get(e.src, {}).get("added", []))
+        if e.line in changed:
             primary = True  # an arrow that leaves a changed line is part of the change, so always show it
-        if src.role != "container":
-            line = src.shown_index(line)
         edges.append({"from": e.src, "to": e.dst, "kind": e.kind, "line": line, "primary": bool(primary)})
 
     counts: Dict[str, int] = {

@@ -263,7 +263,8 @@ svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height:
     const META = DATA.meta;
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     const hash = (s) => { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 99991) + 1; };
     const $ = (id) => document.getElementById(id);
 
@@ -350,7 +351,8 @@ svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height:
     const root = (META.root || "").replace(/\\/g, "/");
     const fileUrl = (file, line) => {
       const abs = (root.startsWith("/") ? root : "/" + root) + "/" + file;
-      return "vscode://file" + encodeURI(abs) + ":" + line;
+      // Encode each path segment, so "#" or "?" in a name stays part of the path.
+      return "vscode://file" + abs.split("/").map((seg) => /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg)).join("/") + ":" + line;
     };
     const els = {}, frames = {};
     const ordered = BLOCKS.filter((b) => b.role === "container").concat(BLOCKS.filter((b) => b.role !== "container"));
@@ -637,8 +639,11 @@ svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height:
     viewport.addEventListener("pointercancel", endPointer);
     viewport.addEventListener("wheel", (ev) => {
       ev.preventDefault();
-      if (ev.ctrlKey || ev.metaKey) zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.0022));
-      else { cam = { ...cam, x: cam.x - ev.deltaX, y: cam.y - ev.deltaY }; touched = true; applyCam(); }
+      // Firefox reports line or page steps for a mouse wheel; turn them into pixels.
+      const unit = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? viewport.clientHeight : 1;
+      const dx = ev.deltaX * unit, dy = ev.deltaY * unit;
+      if (ev.ctrlKey || ev.metaKey) zoomAt(ev.clientX, ev.clientY, Math.exp(-dy * 0.0022));
+      else { cam = { ...cam, x: cam.x - dx, y: cam.y - dy }; touched = true; applyCam(); }
     }, { passive: false });
     document.addEventListener("keydown", (ev) => {
       if (ev.target.closest && ev.target.closest("button, a, summary")) return;

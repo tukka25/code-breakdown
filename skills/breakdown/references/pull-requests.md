@@ -20,6 +20,8 @@ You never summarise the change yourself; the render quotes the author's text exa
   Use `baseRefOid` as `base` and `headRefOid` as `head`. If the head commit is not in the local repository, fetch it with `git fetch origin pull/42/head`.
 - **A branch with no PR:** `base` is the branch it goes into (often `main` or `origin/main`), and `head` is the branch. Branch names work; so do commit shas.
 
+**Always set `head` unless the change is in the working tree you have checked out.** Without `head`, every block is read from the working tree, which may be the base branch.
+
 ## 2. See what changed
 
 ```
@@ -32,19 +34,22 @@ git diff -U0 <base>...<head> -- <file>
 Line numbers in the spec come from the head version. When the head branch is checked out, read the files directly. Otherwise print a file at the head with line numbers, without checking anything out:
 
 ```
-git show <head>:<file> | cat -n
+git grep -n -e '' <head> -- <file>
 ```
 
-Deleted declarations take their line numbers from the merge base. Get it with `git merge-base <base> <head>`, then run `git show <merge-base>:<file> | cat -n`.
+Each line comes out as `<head>:<file>:<number>:<text>`.
+
+Deleted declarations take their line numbers from the merge base. Get it with `git merge-base <base> <head>`, then run `git grep -n -e '' <merge-base> -- <file>`.
 
 ## 4. Choose blocks
 
-- **Entry:** where the change starts. That is the highest changed function on each call path, such as a route handler or a public method. Two unrelated changes become two entries.
-- **Changed declarations** along those paths: functions, methods, and types whose fields changed.
-- **Unchanged neighbours a reader needs:** the caller that leads into a changed function, and the callee whose behaviour the change relies on. They show dimmed.
-- **Deleted declarations:** blocks with `"side": "base"`, using line numbers from the merge base.
+For a change, these rules come before the general trimming order in SKILL.md:
 
-Keep to about 16 blocks, as in SKILL.md, and name what you left out in the reply.
+- **Entry:** where the change starts. That is the highest changed function on each call path, such as a route handler or a public method. Two unrelated changes become two entries.
+- **Changed and new declarations** along those paths: functions, methods, and types whose fields changed. Never leave one out for space, not even a new exception class.
+- **Unchanged neighbours a reader needs:** the caller that leads into a changed function, the callee whose behaviour the change relies on, and the types a changed line reads or writes. They show dimmed.
+- **Deleted declarations:** blocks with `"side": "base"`, using line numbers from the merge base. An arrow can point at one from the removed line that called it.
+- **Trimming:** if that is more than about 16 blocks, trim only unchanged neighbours, in SKILL.md's order, and name them in the reply.
 
 ## 5. Write the spec
 

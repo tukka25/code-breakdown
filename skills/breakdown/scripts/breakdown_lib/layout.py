@@ -13,6 +13,7 @@ import math
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
+from .lang import display_width
 from .model import Block, Spec
 from .order import FREE, Order
 
@@ -34,7 +35,7 @@ CPAD = 22        # container side padding
 CHILD_COL_GAP = 104
 TAIL = 26        # room for a container's closing line
 TAB = 4
-CLOSERS = {"}", "};", "})", "end", "end;", "};"}
+CLOSERS = {"}", "};", "})", "end", "end;"}
 
 
 @dataclass
@@ -61,7 +62,7 @@ def display(line: str) -> str:
 
 
 def text_width(lines: List[str]) -> float:
-    return max((len(display(l)) for l in lines), default=0) * CHAR_W
+    return max((display_width(display(l)) for l in lines), default=0) * CHAR_W
 
 
 def block_size(lines: List[str]) -> Tuple[float, float]:

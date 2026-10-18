@@ -70,6 +70,7 @@ Each run writes one folder at the root of your repository:
 .breakdown/2026-10-18-endpoint-post-orders/
   canvas.html            open it in any browser; works offline
   tree.json              the checked blocks, arrows and layout
+  spec.json              the spec, to render it again later
   breakdown.excalidraw   only when you asked for it
 ```
 
@@ -112,10 +113,11 @@ breakdown.py render ─────────▶ canvas.html, tree.json, break
 The check:
 
 - requires each range to start at its declaration, and points at the right line when it doesn't;
-- extends a block upward over its decorators and doc comments;
-- rejects a block that stops part-way, or runs into the next declaration (by indentation in Python, by brackets elsewhere);
+- extends a block upward over its decorators (including ones spread over several lines) and doc comments;
+- rejects a block that stops part-way (by indentation in Python, by brackets elsewhere);
+- rejects a Python block that runs into the next declaration, and warns about the same in brace languages;
 - rejects overlapping blocks and methods outside their class;
-- rejects an arrow whose target isn't named in the source block, unless `via` gives the exact text that reaches it;
+- rejects an arrow whose target isn't named in the source block's code (comments and docstrings don't count), unless `via` gives the exact text that reaches it;
 - rejects labels that judge the code ("robust", "clean"), since labels only name a role ("Entry point", "Writes DB");
 - lists names a block mentions with no arrow drawn, and functions or classes it mentions that no block covers, so missing pieces get noticed.
 

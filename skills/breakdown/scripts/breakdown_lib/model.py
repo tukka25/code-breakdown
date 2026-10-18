@@ -90,6 +90,8 @@ class Spec:
     pr: Optional[int] = None
     base: Optional[str] = None
     head: Optional[str] = None
+    # Filled in by the check when base is set: per block, status and changed lines (see diff.py).
+    markers: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.by_id = {b.id: b for b in self.blocks}
@@ -210,7 +212,7 @@ def load_spec(data: Any) -> Tuple[Optional[Spec], List[Dict[str, str]], List[str
         blocks.append(Block(
             id=bid, file=path, start=start, end=end, role=role,
             parent=_text(raw.get("parent")), name=_text(raw.get("name")),
-            label=_text(label), side=side, no_bracket_check=bool(raw.get("no_bracket_check", False)),
+            label=_text(label), side=side, no_bracket_check=raw.get("no_bracket_check") is True,
             index=i,
         ))
 

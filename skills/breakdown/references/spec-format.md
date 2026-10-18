@@ -34,7 +34,7 @@ What the check does to each block:
 - Moves `start` up over decorators, attributes and doc comments directly above it, and reports that as a fix.
 - Requires the block's name in its first lines (after decorators and comments). If it is not there, the error gives the line where the declaration really is.
 - For Python, requires the block to end where the indented body ends: not before, not into the next declaration. The error gives the right `end`.
-- For brace languages, requires brackets to balance once strings and comments are skipped. An unclosed block gets the line where it really closes.
+- For brace languages, requires brackets to balance once strings and comments are skipped. An unclosed block gets the line where it really closes. A block that seems to continue past its declaration into the next one gets a warning with the line to end at.
 - Rejects blocks that overlap, unless one is the other's parent, and methods that sit outside their container's lines.
 
 ## Containers
@@ -76,7 +76,7 @@ Which arrows to draw:
 
 `check` prints two kinds of hint. Neither stops the render.
 
-- **A name with no arrow:** a block mentions another chosen block but has no arrow to it. Add the arrow when the code uses it.
+- **A name with no arrow:** a block mentions another chosen block but has no arrow to it. Add the arrow when the code uses it. Short lowercase names (under 5 characters with no underscore, such as `find` or `save`) are too common to hint, so check calls to them yourself.
 - **A declaration with no block:** a block mentions a function or class declared in one of the files you already use, but no block covers it. Add it, or leave it out on purpose and list it under "Left out" in your reply. Declarations in files you have not used yet are not checked, so follow every call yourself.
 
 ## Changes
@@ -101,9 +101,12 @@ Code that is never reached from an entry is drawn as its own start, and the rend
 
 `render` writes `.breakdown/<date>-<kind>-<slug>/` at the repository root:
 
-- `canvas.html`: one standalone file, works offline.
+- `canvas.html`: one standalone file, works offline. It holds the repository's local path for the VS Code links.
 - `tree.json`: the checked blocks, arrows and both layouts.
+- `spec.json`: the spec as you wrote it. To draw it again later, run `render` on this copy.
 - `breakdown.excalidraw`: only with `--excalidraw`. Opens at excalidraw.com or in the VS Code Excalidraw extension.
+
+The repository root is the folder that holds `.breakdown/` when the spec lives there. Otherwise it is the git root of the current folder; `--root` overrides both.
 
 It also adds `.breakdown/` to `.git/info/exclude` the first time. That is its only write outside `.breakdown/`; `--no-exclude` skips it.
 

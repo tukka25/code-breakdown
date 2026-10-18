@@ -32,7 +32,8 @@ Each run writes one folder in the repository being analysed. Re-running the same
 ```
 .breakdown/2026-10-18-endpoint-post-orders/
   canvas.html            always; one standalone file that works offline
-  tree.json              the checked blocks, arrows and both layouts, so it can be re-rendered
+  tree.json              the checked blocks, arrows and both layouts
+  spec.json              the spec as written, so it can be rendered again
   breakdown.excalidraw   only when asked
 ```
 

@@ -38,7 +38,7 @@ def ensure_git_exclude(root: Path) -> bool:
     """Add .breakdown/ to .git/info/exclude once. Returns True when it was added."""
     try:
         out = subprocess.run(["git", "-C", str(root), "rev-parse", "--git-path", "info/exclude"],
-                             capture_output=True, text=True, check=True)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
     except (OSError, subprocess.CalledProcessError):
         return False
     path = Path(out.stdout.strip())

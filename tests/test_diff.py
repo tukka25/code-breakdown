@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -52,8 +53,8 @@ def notify(order):
 
 def git(repo, *args):
     subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True,
-                   env={"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com", "GIT_COMMITTER_NAME": "t",
-                        "GIT_COMMITTER_EMAIL": "t@example.com", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"})
+                   env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+                        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"})
 
 
 class Hunks(unittest.TestCase):
