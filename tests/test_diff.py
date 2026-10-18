@@ -117,6 +117,16 @@ class Markers(unittest.TestCase):
         self.assertEqual(claim["source"], "commits")
         self.assertEqual(claim["title"], "1 commit on feature")
         self.assertEqual(claim["body"], "notify instead of legacy total")
+        self.assertEqual([c["message"] for c in claim["commits"]], ["notify instead of legacy total"])
+        self.assertRegex(claim["commits"][0]["sha"], r"^[0-9a-f]{7,}$")
+
+    def test_each_commit_keeps_its_own_message(self):
+        (self.repo / "orders.py").write_text(HEAD + "\n\ndef audit(order):\n    return order\n")
+        git(self.repo, "commit", "-q", "-am", "Add audit\n\nKeeps a trail.")
+        claim = commit_messages(Source(self.repo), "main", "feature")
+        self.assertEqual(claim["title"], "2 commits on feature")
+        self.assertEqual([c["message"] for c in claim["commits"]],
+                         ["notify instead of legacy total", "Add audit\n\nKeeps a trail."])
 
     def test_base_blocks_are_read_from_the_base_version(self):
         spec, report = run_check(self.spec(), Source(self.repo))

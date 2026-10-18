@@ -102,7 +102,11 @@ def render_excalidraw(payload: Dict[str, Any], mode: str = "column") -> Dict[str
     d.text("title", x0, y0 - 70, f"{kind}: {meta['title']}", 26, FONT_HAND)
     claim = meta.get("claim")
     if claim:
-        body = (claim.get("body") or "").strip() or "This pull request has no description."
+        if claim.get("commits"):
+            # Each commit's short sha starts its subject line, so one message reads apart from the next.
+            body = "\n\n".join(f"{c['sha']}  {c['message']}" for c in claim["commits"])
+        else:
+            body = (claim.get("body") or "").strip() or "This pull request has no description."
         if len(body) > CLAIM_CHARS:
             body = body[:CLAIM_CHARS] + "\n(first 1200 characters; the canvas has the full text)"
         source = f"PR #{claim.get('number')}" if claim.get("number") else "commit messages"

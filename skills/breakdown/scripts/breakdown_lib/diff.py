@@ -200,15 +200,27 @@ def commit_messages(source: Source, base: str, head: Optional[str]) -> Optional[
     """For a branch with no PR: its commit messages, verbatim and oldest first, as the author's claim."""
     try:
         start = source.merge_base(base, head)
-        text = source.git("log", "--reverse", "--format=%s%n%n%b%x00", f"{start}..{head or 'HEAD'}")
+        text = source.git("log", "--reverse", "--format=%h%x01%s%n%n%b%x00", f"{start}..{head or 'HEAD'}")
     except SourceError:
         return None
-    messages = [m.strip() for m in text.split("\x00") if m.strip()]
-    if not messages:
+    commits = []
+    for entry in text.split("\x00"):
+        sha, _, message = entry.strip().partition("\x01")
+        if message.strip():
+            commits.append({"sha": sha, "message": message.strip()})
+    if not commits:
         return None
-    body = "\n\n".join(messages)
+    body = "\n\n".join(c["message"] for c in commits)
     if len(body) > CLAIM_CHARS:
         body = body[:CLAIM_CHARS] + "\n\n(cut at 20,000 characters)"
-    count = len(messages)
+    # The same budget for the per-commit list; the commit that crosses it is cut and carries the note.
+    kept, room = [], CLAIM_CHARS
+    for c in commits:
+        if len(c["message"]) > room:
+            kept.append({**c, "message": c["message"][:room].rstrip() + "\n\n(cut at 20,000 characters)"})
+            break
+        kept.append(c)
+        room -= len(c["message"])
+    count = len(commits)
     return {"source": "commits", "title": f"{count} commit{'s' if count != 1 else ''} on {head or 'HEAD'}",
-            "body": body, "number": None, "url": None}
+            "body": body, "commits": kept, "number": None, "url": None}

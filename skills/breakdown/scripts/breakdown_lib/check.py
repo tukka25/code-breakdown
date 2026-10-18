@@ -407,8 +407,13 @@ class Checker:
 
     # Arrows ---------------------------------------------------------------
 
-    def _search(self, src: Block, text: str, *, raw: bool, keep_strings: bool, skip_own: bool) -> int:
-        """First index among src's shown lines where text appears as code."""
+    def _search(self, src: Block, text: str, *, raw: bool, keep_strings: bool, skip_own: bool,
+                removed_first: bool = False) -> int:
+        """First index among src's shown lines where text appears as code.
+
+        In a change, an edited line shows its removed version just above the new one. Current lines win,
+        so an arrow leaves from code that exists; removed_first reverses that for a target the change
+        deleted."""
         lines = src.shown
         if not raw:
             lines = masked(lines, family(src.file), keep_strings, rust=src.file.endswith(".rs"))
@@ -418,10 +423,10 @@ class Checker:
             lines = ["" if any(lo <= i <= hi for lo, hi in kids) else line for i, line in enumerate(lines)]
         pattern = word(text) if IDENT.match(text) else re.compile(re.escape(text))
         own = src.shown_index(src.def_line) if skip_own else -1
-        for i, line in enumerate(lines):
-            if i != own and pattern.search(line):
-                return i
-        return -1
+        hits = [i for i, line in enumerate(lines) if i != own and pattern.search(line)]
+        removed = {i for i, (_, mark) in enumerate(src.rows or []) if mark == "del"}
+        hits.sort(key=lambda i: (i in removed) != removed_first)
+        return hits[0] if hits else -1
 
     def edges(self) -> None:
         spec = self.spec
@@ -446,7 +451,7 @@ class Checker:
             # A via is the agent's exact text, strings included. A name must appear in code; for a type,
             # a quoted forward reference such as list["OrderLine"] counts.
             line = self._search(src, evidence, raw=bool(e.via), keep_strings=dst.role == "type",
-                                skip_own=not e.via and dst.token == src.token)
+                                skip_own=not e.via and dst.token == src.token, removed_first=dst.side == "base")
             if line < 0:
                 self.error(e.where, f'"{evidence}" does not appear in the code of {src.id} ({src.span})',
                            'if the code reaches it under another spelling, set "via" to the exact text '

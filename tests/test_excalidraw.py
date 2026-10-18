@@ -15,6 +15,17 @@ class Excalidraw(unittest.TestCase):
         root, data = example(name)
         return render_excalidraw(payload_for(root, data), mode)
 
+    def test_claim_names_each_commit(self):
+        root, data = example("fastapi-orders")
+        payload = payload_for(root, data)
+        payload["meta"]["claim"] = {"source": "commits", "title": "2 commits on feature", "body": "First\n\nWhy\n\nSecond",
+                                    "commits": [{"sha": "abc1234", "message": "First\n\nWhy"},
+                                                {"sha": "def5678", "message": "Second"}],
+                                    "number": None, "url": None}
+        texts = [e["text"] for e in render_excalidraw(payload, "column")["elements"] if e["type"] == "text"]
+        claim = next(t for t in texts if t.startswith("Author's claim"))
+        self.assertIn("abc1234  First\n\nWhy\n\ndef5678  Second", claim)
+
     def test_top_level_shape(self):
         d = self.drawing("fastapi-orders")
         self.assertEqual(d["type"], "excalidraw")

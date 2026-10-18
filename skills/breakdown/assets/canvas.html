@@ -96,7 +96,8 @@ svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height:
   font-family: var(--font-code); font-size: var(--code-size); line-height: 16px; font-variant-ligatures: none; tab-size: 4;
 }
 .box.container { background: transparent; cursor: default; }
-.box.same { opacity: 0.62; }
+/* Dim the contents, not the box: an opaque background keeps the arrows behind it hidden. */
+.box.same > * { opacity: 0.62; }
 .cap { display: flex; align-items: center; gap: 10px; height: 22px; font-size: 10px; color: var(--muted); white-space: nowrap; }
 .cap a { color: inherit; text-decoration: none; overflow: hidden; text-overflow: ellipsis; }
 .cap a:hover { color: var(--fg); text-decoration: underline; }
@@ -169,6 +170,11 @@ svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height:
 .claim .src { font-family: var(--font-code); font-size: 11px; color: var(--muted); }
 .claim .src a { color: var(--ink-code); }
 .claim pre { margin: 10px 0 0; white-space: pre-wrap; word-break: break-word; font-family: var(--font-body); font-size: 13.5px; color: var(--fg); }
+.claim .commits { margin: 12px 0 0; padding: 0; list-style: none; }
+.claim .commits li + li { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.claim .commits .sha { display: block; font-family: var(--font-code); font-size: 11px; color: var(--muted); }
+.claim .commits .subject { display: block; margin-top: 2px; font-weight: 600; font-size: 13.5px; color: var(--fg); }
+.claim .commits pre { margin-top: 6px; }
 .claim .close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--fg); cursor: pointer; }
 .fail { position: fixed; inset: 20% 10% auto; z-index: 9; padding: 16px; border: 1px solid var(--del); border-radius: 10px; background: var(--panel); color: var(--fg); font-family: var(--font-code); white-space: pre-wrap; }
 
@@ -235,6 +241,7 @@ svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height:
   <h2 id="claim-title">Author's claim</h2>
   <div class="src" id="claim-src"></div>
   <pre id="claim-body"></pre>
+  <ol class="commits" id="claim-commits" hidden></ol>
 </section>
 
 <script type="application/json" id="bd-data">__BD_DATA__</script>
@@ -676,7 +683,9 @@ svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height:
     document.title = META.title + " · breakdown";
     const stats = [`${counts.blocks} blocks`, `${counts.arrows} arrows`, `${counts.files} ${counts.files === 1 ? "file" : "files"}`];
     if (counts.changed !== undefined) stats.push(`${counts.changed} changed`, `${counts.added} new`, `${counts.deleted} deleted`);
-    if (META.base) stats.push(`${META.base.slice(0, 12)} → ${(META.head || "working tree").slice(0, 12)}`);
+    // A commit sha is cut to 12 characters; a branch name is shown whole. The pair wraps as one piece.
+    const ref = (r) => /^[0-9a-f]{13,40}$/i.test(r) ? r.slice(0, 12) : r;
+    if (META.base) stats.push(`${ref(META.base)}\u00a0→\u00a0${META.head ? ref(META.head) : "working\u00a0tree"}`);
     $("stats").textContent = stats.join(" · ");
     if (CLAIM) {
       const btn = $("claim-btn");
@@ -684,7 +693,21 @@ svg#ink, svg#ink-over { position: absolute; left: 0; top: 0; width: 1px; height:
       const from = CLAIM.source === "commits" ? "From the commit messages, oldest first" : "From the pull request";
       $("claim-src").innerHTML = esc(from) + (CLAIM.url ? ` · <a href="${esc(CLAIM.url)}" target="_blank" rel="noopener">${esc(CLAIM.url)}</a>` : "");
       $("claim-title").textContent = CLAIM.title || "Author's claim";
-      $("claim-body").textContent = CLAIM.body && CLAIM.body.trim() ? CLAIM.body : "This pull request has no description.";
+      if (CLAIM.commits && CLAIM.commits.length) {
+        // One entry per commit: its short sha, its subject, then the rest of its message, all verbatim.
+        $("claim-body").hidden = true;
+        const list = $("claim-commits");
+        list.hidden = false;
+        list.innerHTML = CLAIM.commits.map((c) => {
+          const cut = c.message.indexOf("\n");
+          const subject = cut < 0 ? c.message : c.message.slice(0, cut);
+          const rest = cut < 0 ? "" : c.message.slice(cut + 1).trim();
+          return `<li><span class="sha">${esc(c.sha)}</span><span class="subject">${esc(subject)}</span>` +
+            (rest ? `<pre>${esc(rest)}</pre>` : "") + "</li>";
+        }).join("");
+      } else {
+        $("claim-body").textContent = CLAIM.body && CLAIM.body.trim() ? CLAIM.body : "This pull request has no description.";
+      }
       btn.addEventListener("click", () => { $("claim").hidden = !$("claim").hidden; });
       $("claim-close").addEventListener("click", () => { $("claim").hidden = true; });
     }

@@ -253,6 +253,34 @@ class Changes(unittest.TestCase):
         edge = spec.edges[0]
         self.assertEqual(spec.block("place").rows[edge.line], ("    legacy_total(o)", "del"))
 
+    def test_an_edited_call_keeps_its_arrow_on_the_new_line(self):
+        self.commit({"o.py": "def place(o):\n    total = price(o)\n    return total\n\n\ndef price(o):\n    return 1\n"},
+                    "base")
+        git(self.repo, "checkout", "-q", "-b", "feature")
+        self.commit({"o.py": "def place(o):\n    subtotal = price(o)\n    return subtotal\n\n\n"
+                             "def price(o):\n    return 1\n"}, "rename total")
+        spec, report = run_check({
+            "kind": "pr", "title": "t", "base": "main", "head": "feature", "entry": ["place"],
+            "blocks": [{"id": "place", "file": "o.py", "start": 1, "end": 3},
+                       {"id": "price", "file": "o.py", "start": 6, "end": 7}],
+            "edges": [{"from": "place", "to": "price"}]}, Source(self.repo))
+        self.assertTrue(report.ok, report.errors)
+        edge = spec.edges[0]
+        self.assertEqual(spec.block("place").rows[edge.line], ("    subtotal = price(o)", "add"))
+
+    def test_a_deleted_target_is_reached_from_the_removed_line(self):
+        self.commit({"o.py": "def place(o):\n    fetch(o)\n    return o\n\n\ndef fetch(o):\n    return o\n"}, "base")
+        git(self.repo, "checkout", "-q", "-b", "feature")
+        self.commit({"o.py": "def place(o):\n    client.fetch(o)\n    return o\n"}, "use the client")
+        spec, report = run_check({
+            "kind": "pr", "title": "t", "base": "main", "head": "feature", "entry": ["place"],
+            "blocks": [{"id": "place", "file": "o.py", "start": 1, "end": 3},
+                       {"id": "fetch", "file": "o.py", "start": 6, "end": 7, "side": "base"}],
+            "edges": [{"from": "place", "to": "fetch"}]}, Source(self.repo))
+        self.assertTrue(report.ok, report.errors)
+        edge = spec.edges[0]
+        self.assertEqual(spec.block("place").rows[edge.line], ("    fetch(o)", "del"))
+
 
 class Cli(unittest.TestCase):
     def setUp(self):
