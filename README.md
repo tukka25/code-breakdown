@@ -4,13 +4,15 @@
 
 Ask your coding agent to break down a file, an HTTP endpoint or a pull request, and get a canvas of the **real code**. The code is cut at declaration boundaries and laid out in the order it runs: the entry point, then what it calls, then the types it uses. You get the code itself, not an essay about it.
 
-![POST /orders broken down: the route handler on the left, the service and repository functions it calls in the middle, the request, response and table models in a Data column on the right](docs/images/endpoint-post-orders.png)
+![Stepping through POST /orders in reading order: each step moves to the next block of real code, from the route handler to the service it calls, and fades the rest](docs/images/demo.gif)
 
 ## Why
 
 AI-written code tends to look tidy until you try to follow it. Prose summaries of it are confident and can't be checked. GitHub shows a PR's files in alphabetical order, and reviewers miss more when they read in the wrong order. So this skill shows the pieces and the flow, in the order a reader needs them.
 
 The agent never types code into the picture. It picks line ranges and declares arrows, and a script cuts the text from your files and rejects any range or arrow that doesn't match the code.
+
+If it saves you a review, a ⭐ helps others find it.
 
 ## Install
 
@@ -92,6 +94,8 @@ The first run adds `.breakdown/` to `.git/info/exclude`, so breakdowns never end
   - Boxes are marked new, changed or deleted. Unchanged neighbours are dimmed.
   - An arrow that leaves a changed line always shows.
   - **Author's claim** quotes the author's own words exactly: the PR's title and description, or, for a branch with no PR, its commit messages. The agent never writes its own summary.
+
+![POST /orders broken down: the route handler on the left, the service and repository functions it calls in the middle, the request, response and table models in a Data column on the right](docs/images/endpoint-post-orders.png)
 
 ![A TypeScript file: the exported function, the helpers it calls, a class drawn as a frame around its methods, and the interfaces in a Data column](docs/images/file-with-class.png)
 
